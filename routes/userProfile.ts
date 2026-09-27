@@ -58,10 +58,13 @@ export function getUserProfile () {
         if (!code) {
           throw new Error('Username is null')
         }
-        const singleQuoteRegex = /^'(?:[^'\\]|\\.)*'$/
-        const doubleQuoteRegex = /^"(?:[^"\\]|\\.)*"$/
-        const backtickRegex = /^`(?:[^`\\$]|\\.|\$(?!{))*`$/
-        const numericRegex = /^-?\d+(?:\.\d+)?$/
+        if (/[#!]\{/.test(code) || /[\r\n\u2028\u2029]/.test(code)) {
+          throw new Error('Unsafe code execution blocked')
+        }
+        const singleQuoteRegex = /^'(?:[^'\\\r\n]|\\['\\])*'$/
+        const doubleQuoteRegex = /^"(?:[^"\\\r\n]|\\["\\])*"$/
+        const backtickRegex = /^`(?:[^`\\$\r\n]|\\`|\\\$|\\\\)*`$/
+        const numericRegex = /^[ \d+\-*\/%().]*\d[ \d+\-*\/%().]*$/
         const booleanRegex = /^(?:true|false|null|undefined)$/
 
         const isSafe = singleQuoteRegex.test(code) ||
@@ -74,6 +77,9 @@ export function getUserProfile () {
           throw new Error('Unsafe code execution blocked')
         }
         username = eval(code) // eslint-disable-line no-eval
+        if (typeof username === 'string' && (/[#!]\{/.test(username) || /[\r\n\u2028\u2029]/.test(username))) {
+          throw new Error('Unsafe code execution blocked')
+        }
       } catch (err) {
         username = '\\' + username
       }
@@ -85,6 +91,7 @@ export function getUserProfile () {
     const theme = themes[themeKey] || themes['bluegrey-lightgreen']
 
     if (username) {
+      username = String(username).replace(/[\r\n\u2028\u2029]/g, '')
       template = template.replace(/_username_/g, username)
     }
     template = template.replace(/_emailHash_/g, security.hash(user?.email))
